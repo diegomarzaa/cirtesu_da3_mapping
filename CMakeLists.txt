@@ -12,6 +12,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/ply_publisher_node.py
   scripts/camera_poses_publisher_node.py
+  scripts/frame_recorder_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -1,0 +1,34 @@
+# frame_recorder:
+#   ros__parameters:
+#     # Camera image topic to subscribe to while recording
+#     image_topic: '/camera/image_raw'
+
+#     # Where sessions are saved. Each session creates a timestamped subfolder:
+#     #   da3_sessions/session_YYYYMMDD_HHMMSS/
+#     #     frames/      ← PNGs saved by the node
+#     #     pcd/         ← DA3-Streaming output (combined_pcd.ply, chunk plys)
+#     #     camera_poses.txt
+#     #     intrinsic.txt
+#     session_base_dir: '/home/diego/Cirtesu/media/da3_sessions'
+
+#     # DA3-Streaming invocation (paths inside the container)
+#     da3_python: '/opt/venvs/da3/bin/python3'
+#     da3_script: '/home/diego/Cirtesu/Repositories/Depth-Anything-3/da3_streaming/da3_streaming.py'
+#     da3_config: '/home/diego/Cirtesu/Repositories/Depth-Anything-3/da3_streaming/configs/diego_config.yaml'
+
+#     # Target save rate in FPS (default: 1 frame per second).
+#     # Set <= 0 to save every received frame.
+#     target_save_fps: 1.0
+
+#     # Voxel downsample when loading the final PLY for RViz (0.0 = disabled)
+#     voxel_downsample: 0.0
+
+#     # TF frame for the published results (must match the static TF child frame)
+#     frame_id: 'da3_world'
+
+#     # Result topics
+#     pointcloud_topic: '/cirtesu/map_pointcloud'
+
+#     # Visual sizes for camera markers
+#     axis_length:  0.06
+#     frustum_depth: 0.18
