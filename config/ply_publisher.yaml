@@ -1,0 +1,21 @@
+# ply_publisher:
+#   ros__parameters:
+#     ply_path: '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/pcd/combined_pcd.ply'
+#     frame_id: 'da3_world'    # DA3/OpenCV world (Y-down); TF rotates it to 'map'
+#     topic: '/cirtesu/map_pointcloud'
+#     publish_rate_hz: 0.0      # 0.0 = one-shot with transient_local QoS
+#     voxel_downsample: 0.0     # 0.0 = disabled; try 0.01-0.02 for large clouds
+
+# camera_poses_publisher:
+#   ros__parameters:
+#     poses_path: '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/camera_poses.txt'
+#     intrinsics_path: '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/intrinsic.txt'
+#     frame_id: 'da3_world'
+#     path_topic: '/cirtesu/camera_path'
+#     axes_topic: '/cirtesu/camera_axes'
+#     frustums_topic: '/cirtesu/camera_frustums'
+#     publish_rate_hz: 0.0
+#     axis_length: 0.12
+#     axis_line_width: 0.01
+#     frustum_depth: 0.18
+#     frustum_line_width: 0.006
