@@ -1,134 +1,98 @@
 # cirtesu_da3_mapping
 
-Paquete ROS2 para mapeado 3D usando DA3-Streaming.
+Integración de ROS2 para mapeado 3D usando DA3-Streaming.
 
-1. **Modo visualización**
-   - [Fase 0](#fase-0)
+1. [Fase 0 - Visualización simple](#fase-0-visualización-simple)
    - cargar una salida ya existente de DA3-Streaming
    - abrir RViz2
    - ver el pointcloud y la geometría de cámaras
 
-2. **Modo record -> DA3-Streaming -> map**
-   - [Fase 1](#fase-1)
+2. [Fase 1 - Grabación y procesado](#fase-1-grabación-y-procesado)
    - suscribirse a una cámara en ROS2
-   - empezar a guardar imágenes mediante un servicio
-   - parar la grabación con otro servicio
+   - empezar a guardar imágenes una vez se llame un servicio
+   - parar la grabación de imágenes con otro servicio
    - lanzar DA3-Streaming al terminar
    - publicar automáticamente el resultado en RViz2
 
-3. **Modo mapping while recording**
-   - [Fase 2](#fase-2)
-   - ...
+3. [Fase 2 - Mapeado incremental](#fase-2-mapeado-incremental)
+   - suscribirse a una cámara en ROS2
+   - empezar una sesión incremental una vez se llame un servicio
+   - guardar frames mientras llegan imágenes
+   - procesar chunks solapados con DA3-Streaming en paralelo
+   - publicar el mapa y la trayectoria acumulados en RViz2 mientras se van guardando frames
 
-Se cubre:
+## Pre-requisitos
 
-- publicación de `combined_pcd.ply` como `sensor_msgs/PointCloud2`
-- visualización de `camera_poses.txt`: `nav_msgs/Path`, ejes de cámara y frustums
-- launch con RViz2 y static TF para visualizar el mundo DA3 dentro de la convención de ROS
-- grabación básica de sesiones desde un topic de imagen y procesado posterior con DA3-Streaming
+Los módulos, pesos y utilidades de DA3 se encuentran en el repositorio `Depth-Anything-3`:
 
-## Fase 0
-
-Validar la visualización en ROS2 de una salida ya generada por DA3-Streaming.
-
-Publicación de:
-
-- `combined_pcd.ply` como `sensor_msgs/PointCloud2`
-- `camera_poses.txt` como `nav_msgs/Path`
-- ejes XYZ de cámara como `visualization_msgs/MarkerArray`
-- frustums de cámara usando `camera_poses.txt + intrinsic.txt` en `visualization_msgs/MarkerArray`
-
-Topics:
-
-- `/cirtesu/map_pointcloud` -> `sensor_msgs/PointCloud2`
-- `/cirtesu/camera_path` -> `nav_msgs/Path`
-- `/cirtesu/camera_axes` -> `visualization_msgs/MarkerArray`
-- `/cirtesu/camera_frustums` -> `visualization_msgs/MarkerArray`
-
-Launch:
 ```bash
-# Con el PLY por defecto (diego_room_few)
-ros2 launch cirtesu_da3_mapping visualize_ply.launch.py
+git clone https://github.com/ByteDance-Seed/Depth-Anything-3.git
+cd Depth-Anything-3
+git submodule update --init --recursive
+```
 
-# Con otro PLY
+- [ ] TODO: Linkear commit exacto y indicar dependencias exactas. En el repo de ellos no está perfecto.
+
+## Fase 0 - Visualización simple
+
+Visualizar en RViz2 una salida ya generada por DA3-Streaming.
+
+```bash
+# Solo PLY
 ros2 launch cirtesu_da3_mapping visualize_ply.launch.py \
-  ply_path:=/ruta/a/otro.ply
+  ply_path:=/ruta/a/combined_pcd.ply
 
-# Con voxel downsample (acelera RViz para nubes grandes)
-ros2 launch cirtesu_da3_mapping visualize_ply.launch.py \
-  voxel_downsample:=0.02
-
-# Con una salida DA3 completa (PLY + poses + intrínsecos)
+# PLY + poses de cámara + intrínsecos
 ros2 launch cirtesu_da3_mapping visualize_ply.launch.py \
   ply_path:=/ruta/a/pcd/combined_pcd.ply \
   camera_poses_path:=/ruta/a/camera_poses.txt \
   intrinsics_path:=/ruta/a/intrinsic.txt
+
+# Con voxel downsample (acelera RViz para nubes grandes)
+ros2 launch cirtesu_da3_mapping visualize_ply.launch.py \
+  ply_path:=/ruta/a/combined_pcd.ply \
+  voxel_downsample:=0.02
 ```
 
-Nodos sueltos:
+Topics:
+
+- `/cirtesu/map_pointcloud` → `sensor_msgs/PointCloud2`
+- `/cirtesu/camera_path` → `nav_msgs/Path`
+- `/cirtesu/camera_axes` → `visualization_msgs/MarkerArray`
+- `/cirtesu/camera_frustums` → `visualization_msgs/MarkerArray`
+
+Parámetros principales:
+
+| Parámetro | Descripción |
+|---|---|
+| `ply_path` | Ruta al fichero `.ply` |
+| `camera_poses_path` | Ruta a `camera_poses.txt` |
+| `intrinsics_path` | Ruta a `intrinsic.txt` |
+| `voxel_downsample` | `0` = desactivado; p.ej. `0.02` |
+| `frame_id` | TF frame del header |
+| `publish_rate_hz` | `0` = one-shot; `>0` = periódico |
+
+## Fase 1 - Grabación y procesado
+
+Grabar frames desde ROS2 y lanzar DA3-Streaming al terminar, publicando el resultado en RViz2.
+
+Estado: `IDLE → RECORDING → PROCESSING → DONE / ERROR`
+
+Primero, dejar configuradas las variables de entorno:
 
 ```bash
-ros2 run cirtesu_da3_mapping ply_publisher_node.py
-ros2 run cirtesu_da3_mapping camera_poses_publisher_node.py
+export DEPTH_ANYTHING_3_DIR=/ruta/a/Depth-Anything-3
+export DA3_CONFIG=/ruta/a/da3_config.yaml
+
+# Opcional:
+export DA3_PYTHON=/path/to/custom/venv # En caso de usar conda u otros
+export DA3_SESSION_BASE=/ruta/a/da3_sessions # Carpeta donde se guardan las sesiones (imágenes, PLYs, etc.)
 ```
 
-Parámetros del launch:
-
-- `ply_path` -> ruta al fichero `.ply`
-- `frame_id` -> TF frame del header (hijo del static TF `map → da3_world`)
-- `topic` -> topic de publicación del pointcloud
-- `publish_rate_hz` -> `0` = one-shot con `transient_local`; `>0` = periódico
-- `voxel_downsample` -> `0` = desactivado; ej. `0.02` para reducir puntos
-- `camera_poses_path` -> ruta al fichero `camera_poses.txt`
-- `intrinsics_path` -> ruta al fichero `intrinsic.txt`
-- `camera_publish_rate_hz` -> `0` = one-shot; `>0` = periódico
-- `camera_axis_length` -> longitud de los ejes XYZ de la cámara
-- `camera_axis_line_width` -> ancho de los ejes XYZ de la cámara
-- `camera_frustum_depth` -> profundidad de los frustums
-- `camera_frustum_line_width` -> ancho de los frustums
-
-## Fase 1
-
-Grabar una sesión desde ROS2 y lanzar DA3-Streaming al terminar, publicando el resultado automáticamente en RViz2:
-
-**`scripts/frame_recorder_node.py`** — nodo principal. Máquina de estados:
-
-```text
-IDLE → RECORDING → PROCESSING → DONE
-                              → ERROR
-```
-
-**`launch/record_and_map.launch.py`** — lanza:
-
-- `frame_recorder`
-- static TF
-- RViz2
-
-**`config/frame_recorder.yaml`** — parámetros por defecto del recorder.
-
-Servicios:
-
-- `/frame_recorder/start_recording` -> `std_srvs/Trigger` -> Crea carpeta de sesión y empieza a guardar frames
-- `/frame_recorder/stop_and_process` -> `std_srvs/Trigger` -> Para el recording y lanza DA3-Streaming en background
-
-Muestreo de imágenes:
-
-- `target_save_fps` -> FPS objetivo de guardado
-
-Ejemplo simple con la cámara del portátil:
+Y luego, lanzar el launch:
 
 ```bash
-ros2 run v4l2_camera v4l2_camera_node --ros-args \
-  -p video_device:=/dev/video0 \
-  -p image_size:="[640,480]" \
-  -r image_raw:=/camera/image_raw \
-  -r camera_info:=/camera/camera_info
-```
-
-Flujo de uso:
-
-```bash
-# 1. Lanzar el sistema
+# 1. Lanzar
 ros2 launch cirtesu_da3_mapping record_and_map.launch.py
 
 # 2. Empezar sesión
@@ -137,30 +101,79 @@ ros2 service call /frame_recorder/start_recording std_srvs/srv/Trigger {}
 # 3. Mover el robot / cámara para capturar frames
 ros2 topic echo /frame_recorder/status
 
-# 4. Parar y procesar
+# 4. Parar y procesar (DA3-Streaming corre en background)
 ros2 service call /frame_recorder/stop_and_process std_srvs/srv/Trigger {}
 ```
 
-Después:
+Topics:
 
-- DA3-Streaming corre en background y el log del nodo muestra su salida
-- cuando termina, se publica automáticamente en RViz:
-  - `/cirtesu/map_pointcloud`
-  - `/cirtesu/camera_path`
-  - `/cirtesu/camera_axes`
-  - `/cirtesu/camera_frustums`
+- `/camera/image_raw` → `sensor_msgs/Image` (entrada)
+- `/cirtesu/map_pointcloud` → `sensor_msgs/PointCloud2` (salida)
+- `/cirtesu/camera_path` → `nav_msgs/Path` (salida)
+- `/cirtesu/camera_axes` → `visualization_msgs/MarkerArray` (salida)
+- `/cirtesu/camera_frustums` → `visualization_msgs/MarkerArray` (salida)
+- `/frame_recorder/status` → `std_msgs/String` (estado)
 
-Parámetros del launch:
+Ejemplo con cámara USB (v4l2):
 
-- `image_topic` -> topic de cámara a grabar
-- `target_save_fps` -> FPS objetivo de guardado
-- `session_base_dir` -> carpeta base para sesiones
-- `da3_python` -> intérprete del entorno DA3
-- `da3_script` -> ruta a `da3_streaming.py`
-- `da3_config` -> config YAML de DA3-Streaming
-- `voxel_downsample` -> downsample opcional al cargar el PLY final
-- `frame_id` -> frame de salida DA3
+```bash
+ros2 run v4l2_camera v4l2_camera_node --ros-args \
+  -p video_device:=/dev/video0 \
+  -p image_size:="[640,480]" \
+  -r image_raw:=/camera/image_raw
+```
 
-Nota:
+## Fase 2 - Mapeado incremental
 
-- La corrección de ejes **OpenCV → ROS** ya se aplica vía TF; la orientación global de DA3-Streaming dependerá de la secuencia si no hay referencias externas (IMU, ArUco, TF).
+Mientras siguen llegando frames, publicando el mapa acumulado en vivo en RViz2.
+
+> Igual que en la fase 1, dejar configuradas las variables de entorno primero.
+
+```bash
+# 1. Lanzar
+ros2 launch cirtesu_da3_mapping incremental_map.launch.py
+
+# 2. Empezar sesión
+ros2 service call /incremental_mapper/start std_srvs/srv/Trigger {}
+
+# 3. Mover el robot / cámara mientras se van publicando chunks
+ros2 topic echo /incremental_mapper/status
+
+# 4. Parar la sesión
+ros2 service call /incremental_mapper/stop  std_srvs/srv/Trigger {}
+```
+
+Topics:
+
+- `/image_raw/compressed` -> `sensor_msgs/msg/CompressedImage` (entrada)
+- `/cirtesu/map_pointcloud` -> `sensor_msgs/PointCloud2` (salida)
+- `/cirtesu/camera_path` -> `nav_msgs/Path` (salida)
+- `/incremental_mapper/status` -> `std_msgs/String` (salida)
+
+Otro ejemplo con parámetros explícitos:
+
+```bash
+ros2 launch cirtesu_da3_mapping incremental_map.launch.py \
+  image_topic:=/image_raw/compressed \
+  target_save_fps:=1.0 \
+  voxel_downsample:=0.01
+```
+
+Ejemplo con un rosbag (usando tiempo simulado):
+
+```bash
+# 1. Lanzar
+ros2 launch cirtesu_da3_mapping incremental_map.launch.py use_sim_time:=true
+
+# 2. Empezar sesión
+ros2 service call /incremental_mapper/start std_srvs/srv/Trigger {}
+
+# 3. Reproducir el bag publicando /clock
+ros2 bag play /ruta/al/bag --clock 50
+
+# 4. Ver estado mientras se guardan frames y se procesan chunks
+ros2 topic echo /incremental_mapper/status
+
+# 5. Parar la sesión al terminar
+ros2 service call /incremental_mapper/stop std_srvs/srv/Trigger {}
+```

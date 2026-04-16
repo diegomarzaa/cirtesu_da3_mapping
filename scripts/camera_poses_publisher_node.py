@@ -24,12 +24,8 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
 
-_DEFAULT_POSES = (
-    '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/camera_poses.txt'
-)
-_DEFAULT_INTRINSICS = (
-    '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/intrinsic.txt'
-)
+_DEFAULT_POSES = ''
+_DEFAULT_INTRINSICS = ''
 
 
 def read_camera_poses(path):

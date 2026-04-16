@@ -13,6 +13,7 @@ install(PROGRAMS
   scripts/ply_publisher_node.py
   scripts/camera_poses_publisher_node.py
   scripts/frame_recorder_node.py
+  scripts/incremental_mapper_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

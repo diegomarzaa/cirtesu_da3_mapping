@@ -21,13 +21,6 @@ from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
 
-# Default path resolves inside the da3-ros2-wrapper container. On the host,
-# /home/diego/Documents/02-Universidad/Cirtesu is mounted as /home/diego/Cirtesu.
-_DEFAULT_PLY = (
-    '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/pcd/combined_pcd.ply'
-)
-
-
 def load_ply(path, voxel_size):
     """Return (points[N,3] float32, colors[N,3] uint8).
 
@@ -87,7 +80,7 @@ class PlyPublisher(Node):
     def __init__(self):
         super().__init__('ply_publisher')
 
-        self.declare_parameter('ply_path', _DEFAULT_PLY)
+        self.declare_parameter('ply_path', '')
         self.declare_parameter('frame_id', 'da3_world')
         self.declare_parameter('topic', '/cirtesu/map_pointcloud')
         self.declare_parameter('publish_rate_hz', 0.0)

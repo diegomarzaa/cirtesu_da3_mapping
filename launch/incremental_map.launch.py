@@ -1,9 +1,9 @@
 """
-record_and_map.launch.py — frame_recorder node + static TF + RViz2.
+incremental_map.launch.py — incremental mapper node + static TF + RViz2.
 
 Launches:
 - static TF: map -> da3_world
-- frame_recorder node
+- incremental mapper node
 - RViz2
 
 External dependencies
@@ -12,15 +12,16 @@ This package expects the Depth-Anything-3 repository and Python environment
 to be provided explicitly, either through launch arguments or environment vars.
 
 Example:
-    ros2 launch cirtesu_da3_mapping record_and_map.launch.py
+    ros2 launch cirtesu_da3_mapping incremental_map.launch.py
 
 Or override explicitly:
-    ros2 launch cirtesu_da3_mapping record_and_map.launch.py \
+    ros2 launch cirtesu_da3_mapping incremental_map.launch.py \
         da3_python:=/opt/venvs/da3/bin/python3 \
         depth_anything_3_dir:=/workspace/Depth-Anything-3 \
         da3_config:=/workspace/Depth-Anything-3/da3_streaming/configs/default.yaml
 """
 import os
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -28,36 +29,38 @@ from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
-_IMAGE_TOPIC = "/camera/image_raw"
+_IMAGE_TOPIC = "/image_raw/compressed"
 _POINTCLOUD_TOPIC = "/cirtesu/map_pointcloud"
+_PATH_TOPIC = "/cirtesu/camera_path"
+
 _WORLD_FRAME = "map"
 _DA3_FRAME = "da3_world"
 
-# Quaternion (x, y, z, w) that rotates da3_world (OpenCV) into map (ROS REP-103):
-#   R = [[ 0, 0, 1],    X_ros =  Z_cv
-#        [-1, 0, 0],    Y_ros = -X_cv
-#        [ 0,-1, 0]]    Z_ros = -Y_cv  (Y-down → Z-up)
+# Static rotation that maps da3_world (OpenCV) → map (REP-103):
+#   R = [[ 0, 0, 1], [-1, 0, 0], [ 0,-1, 0]]
 _QX, _QY, _QZ, _QW = -0.5, 0.5, -0.5, 0.5
 
 
 def generate_launch_description():
     pkg_share = get_package_share_directory("cirtesu_da3_mapping")
+
     default_rviz_cfg = os.path.join(pkg_share, "rviz", "da3_mapping.rviz")
-    default_session_base = os.path.join(str(os.path.expanduser("~")), "da3_sessions")
+    default_session_base = os.path.join(str(Path.home()), "da3_sessions")
 
     da3_python = LaunchConfiguration("da3_python")
     depth_anything_3_dir = LaunchConfiguration("depth_anything_3_dir")
     da3_streaming_dir = LaunchConfiguration("da3_streaming_dir")
-    da3_script = LaunchConfiguration("da3_script")
+    da3_src_dir = LaunchConfiguration("da3_src_dir")
     da3_config = LaunchConfiguration("da3_config")
 
     image_topic = LaunchConfiguration("image_topic")
     pointcloud_topic = LaunchConfiguration("pointcloud_topic")
+    path_topic = LaunchConfiguration("path_topic")
+    frame_id = LaunchConfiguration("frame_id")
     session_base_dir = LaunchConfiguration("session_base_dir")
     target_save_fps = LaunchConfiguration("target_save_fps")
+    debug_save = LaunchConfiguration("debug_save")
     voxel_downsample = LaunchConfiguration("voxel_downsample")
-    frame_id = LaunchConfiguration("frame_id")
-    world_frame = LaunchConfiguration("world_frame")
     use_sim_time = LaunchConfiguration("use_sim_time")
     rviz_config = LaunchConfiguration("rviz_config")
 
@@ -78,9 +81,9 @@ def generate_launch_description():
             description="Path to the DA3 streaming directory.",
         ),
         DeclareLaunchArgument(
-            "da3_script",
-            default_value=PathJoinSubstitution([da3_streaming_dir, "da3_streaming.py"]),
-            description="Path to the DA3 streaming entrypoint script.",
+            "da3_src_dir",
+            default_value=PathJoinSubstitution([depth_anything_3_dir, "src"]),
+            description="Path to the Depth-Anything-3 src directory.",
         ),
         DeclareLaunchArgument(
             "da3_config",
@@ -98,7 +101,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "image_topic",
             default_value=_IMAGE_TOPIC,
-            description="Camera image topic to subscribe to for recording.",
+            description="Compressed image topic consumed by the incremental mapper.",
         ),
         DeclareLaunchArgument(
             "pointcloud_topic",
@@ -106,29 +109,34 @@ def generate_launch_description():
             description="Output topic for accumulated pointcloud.",
         ),
         DeclareLaunchArgument(
-            "session_base_dir",
-            default_value=EnvironmentVariable("DA3_SESSION_BASE", default_value=default_session_base),
-            description="Base directory where session folders are created.",
-        ),
-        DeclareLaunchArgument(
-            "target_save_fps",
-            default_value="1.0",
-            description="Target frame save rate in FPS (<= 0 means save every frame).",
-        ),
-        DeclareLaunchArgument(
-            "voxel_downsample",
-            default_value="0.0",
-            description="Voxel downsample size in meters when loading the PLY (0=off).",
+            "path_topic",
+            default_value=_PATH_TOPIC,
+            description="Output topic for accumulated camera path.",
         ),
         DeclareLaunchArgument(
             "frame_id",
             default_value=_DA3_FRAME,
-            description="Frame ID for DA3 outputs (child frame of the static TF).",
+            description="Frame id used in pointcloud and path headers.",
         ),
         DeclareLaunchArgument(
-            "world_frame",
-            default_value=_WORLD_FRAME,
-            description="ROS world frame (REP-103 Z-up); Fixed Frame in RViz.",
+            "session_base_dir",
+            default_value=EnvironmentVariable("DA3_SESSION_BASE", default_value=default_session_base),
+            description="Base directory where session outputs are stored.",
+        ),
+        DeclareLaunchArgument(
+            "target_save_fps",
+            default_value="1.0",
+            description="Frame save rate. Use 0 to save every incoming frame.",
+        ),
+        DeclareLaunchArgument(
+            "debug_save",
+            default_value="false",
+            description="Save per-chunk debug outputs on disk.",
+        ),
+        DeclareLaunchArgument(
+            "voxel_downsample",
+            default_value="0.01",
+            description="Voxel size for downsampling before publishing.",
         ),
         DeclareLaunchArgument(
             "use_sim_time",
@@ -137,19 +145,19 @@ def generate_launch_description():
         ),
 
         LogInfo(msg=["=============== LAUNCH ARGUMENTS ==============="]),
-        LogInfo(msg=["[record_and_map] DA3 python:      ", da3_python]),
-        LogInfo(msg=["[record_and_map] DA3 repo:        ", depth_anything_3_dir]),
-        LogInfo(msg=["[record_and_map] DA3 script:      ", da3_script]),
-        LogInfo(msg=["[record_and_map] DA3 config:      ", da3_config]),
-        LogInfo(msg=["[record_and_map] RViz config:     ", rviz_config]),
-        LogInfo(msg=["[record_and_map] Session base:    ", session_base_dir]),
-        LogInfo(msg=["[record_and_map] Image topic:     ", image_topic]),
-        LogInfo(msg=["[record_and_map] Pointcloud topic:", pointcloud_topic]),
-        LogInfo(msg=["[record_and_map] Frame id:        ", frame_id]),
-        LogInfo(msg=["[record_and_map] World frame:     ", world_frame]),
-        LogInfo(msg=["[record_and_map] Target save FPS: ", target_save_fps]),
-        LogInfo(msg=["[record_and_map] Voxel downsample:", voxel_downsample]),
-        LogInfo(msg=["[record_and_map] Use sim time:    ", use_sim_time]),
+        LogInfo(msg=["[incremental_map] DA3 python: ", da3_python]),
+        LogInfo(msg=["[incremental_map] DA3 repo: ", depth_anything_3_dir]),
+        LogInfo(msg=["[incremental_map] DA3 streaming dir: ", da3_streaming_dir]),
+        LogInfo(msg=["[incremental_map] DA3 src dir: ", da3_src_dir]),
+        LogInfo(msg=["[incremental_map] Session base: ", session_base_dir]),
+        LogInfo(msg=["[incremental_map] Image topic: ", image_topic]),
+        LogInfo(msg=["[incremental_map] Pointcloud topic: ", pointcloud_topic]),
+        LogInfo(msg=["[incremental_map] Path topic: ", path_topic]),
+        LogInfo(msg=["[incremental_map] Frame id: ", frame_id]),
+        LogInfo(msg=["[incremental_map] Target save FPS: ", target_save_fps]),
+        LogInfo(msg=["[incremental_map] Debug save: ", debug_save]),
+        LogInfo(msg=["[incremental_map] Voxel downsample: ", voxel_downsample]),
+        LogInfo(msg=["[incremental_map] Use sim time: ", use_sim_time]),
         LogInfo(msg=["================================================"]),
 
         Node(
@@ -160,15 +168,15 @@ def generate_launch_description():
                 "--x", "0", "--y", "0", "--z", "0",
                 "--qx", str(_QX), "--qy", str(_QY),
                 "--qz", str(_QZ), "--qw", str(_QW),
-                "--frame-id", world_frame,
-                "--child-frame-id", frame_id,
+                "--frame-id", _WORLD_FRAME,
+                "--child-frame-id", _DA3_FRAME,
             ],
         ),
 
         Node(
             package="cirtesu_da3_mapping",
-            executable="frame_recorder_node.py",
-            name="frame_recorder",
+            executable="incremental_mapper_node.py",
+            name="incremental_mapper",
             output="screen",
             prefix=[da3_python, " -u"],
             parameters=[
@@ -176,13 +184,15 @@ def generate_launch_description():
                     "use_sim_time": use_sim_time,
                     "image_topic": image_topic,
                     "session_base_dir": session_base_dir,
-                    "da3_python": da3_python,
-                    "da3_script": da3_script,
+                    "da3_streaming_dir": da3_streaming_dir,
+                    "da3_src_dir": da3_src_dir,
                     "da3_config": da3_config,
-                    "target_save_fps": target_save_fps,
-                    "voxel_downsample": voxel_downsample,
                     "pointcloud_topic": pointcloud_topic,
+                    "path_topic": path_topic,
                     "frame_id": frame_id,
+                    "target_save_fps": target_save_fps,
+                    "debug_save": debug_save,
+                    "voxel_downsample": voxel_downsample,
                 },
             ],
         ),

@@ -22,16 +22,6 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-_DEFAULT_PLY = (
-    '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/pcd/combined_pcd.ply'
-)
-_DEFAULT_POSES = (
-    '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/camera_poses.txt'
-)
-_DEFAULT_INTRINSICS = (
-    '/home/diego/Cirtesu/media/da3_outputs/diego_room_few/intrinsic.txt'
-)
-
 # Quaternion (x, y, z, w) for R_cv2ros:
 #   R = [[ 0, 0, 1],    X_ros =  Z_cv  (forward stays forward)
 #        [-1, 0, 0],    Y_ros = -X_cv  (right becomes -left)
@@ -41,12 +31,12 @@ _QX, _QY, _QZ, _QW = -0.5, 0.5, -0.5, 0.5
 
 def generate_launch_description():
     pkg_share = get_package_share_directory('cirtesu_da3_mapping')
-    default_rviz = os.path.join(pkg_share, 'rviz', 'ply_view.rviz')
+    default_rviz = os.path.join(pkg_share, 'rviz', 'da3_mapping.rviz')
 
     return LaunchDescription([
         # PLY publisher parameters
         DeclareLaunchArgument(
-            'ply_path', default_value=_DEFAULT_PLY,
+            'ply_path', default_value='',
             description='Absolute path to .ply pointcloud file',
         ),
         DeclareLaunchArgument(
@@ -72,11 +62,11 @@ def generate_launch_description():
         
         # Camera poses publisher parameters
         DeclareLaunchArgument(
-            'camera_poses_path', default_value=_DEFAULT_POSES,
+            'camera_poses_path', default_value='',
             description='Absolute path to camera_poses.txt',
         ),
         DeclareLaunchArgument(
-            'intrinsics_path', default_value=_DEFAULT_INTRINSICS,
+            'intrinsics_path', default_value='',
             description='Absolute path to intrinsic.txt',
         ),
         DeclareLaunchArgument(

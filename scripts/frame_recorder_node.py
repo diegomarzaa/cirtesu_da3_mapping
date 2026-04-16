@@ -39,6 +39,7 @@ Workflow
 """
 import os
 import subprocess
+from pathlib import Path
 import sys
 import threading
 from datetime import datetime
@@ -56,18 +57,9 @@ from std_msgs.msg import Header, String
 from std_srvs.srv import Trigger
 from visualization_msgs.msg import Marker, MarkerArray
 
-# Default paths inside the da3-ros2-wrapper container.
-# On the host, /home/diego/Documents/02-Universidad/Cirtesu is mounted as /home/diego/Cirtesu.
-_DA3_PYTHON = '/opt/venvs/da3/bin/python3'
-_DA3_SCRIPT = (
-    '/home/diego/Cirtesu/Repositories/Depth-Anything-3/'
-    'da3_streaming/da3_streaming.py'
-)
-_DA3_CONFIG = (
-    '/home/diego/Cirtesu/Repositories/Depth-Anything-3/'
-    'da3_streaming/configs/diego_config.yaml'
-)
-_SESSION_BASE = '/home/diego/Cirtesu/media/da3_sessions'
+_IMAGE_TOPIC = "/camera/image_raw"
+_POINTCLOUD_TOPIC = "/cirtesu/map_pointcloud"
+_FRAME_ID = "da3_world"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -195,17 +187,17 @@ class FrameRecorderNode(Node):
     def __init__(self):
         super().__init__('frame_recorder')
 
-        self.declare_parameter('image_topic',         '/camera/image_raw')
-        self.declare_parameter('session_base_dir',    _SESSION_BASE)
-        self.declare_parameter('da3_python',          _DA3_PYTHON)
-        self.declare_parameter('da3_script',          _DA3_SCRIPT)
-        self.declare_parameter('da3_config',          _DA3_CONFIG)
-        self.declare_parameter('target_save_fps', 1.0)
-        self.declare_parameter('voxel_downsample',    0.0)
-        self.declare_parameter('pointcloud_topic',    '/cirtesu/map_pointcloud')
-        self.declare_parameter('frame_id',            'da3_world')
-        self.declare_parameter('axis_length',         0.06)
-        self.declare_parameter('frustum_depth',       0.18)
+        self.declare_parameter('image_topic',      _IMAGE_TOPIC)
+        self.declare_parameter('session_base_dir', str(Path.home() / 'da3_sessions'))
+        self.declare_parameter('da3_python',       'python3')
+        self.declare_parameter('da3_script',       '')
+        self.declare_parameter('da3_config',       '')
+        self.declare_parameter('target_save_fps',  1.0)
+        self.declare_parameter('voxel_downsample', 0.0)
+        self.declare_parameter('pointcloud_topic', _POINTCLOUD_TOPIC)
+        self.declare_parameter('frame_id',         _FRAME_ID)
+        self.declare_parameter('axis_length',      0.06)
+        self.declare_parameter('frustum_depth',    0.18)
 
         self._image_topic   = self.get_parameter('image_topic').value
         self._session_base  = self.get_parameter('session_base_dir').value
