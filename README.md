@@ -2,19 +2,19 @@
 
 Integración de ROS2 para mapeado 3D usando DA3-Streaming.
 
-1. [Fase 0 - Visualización simple](#fase-0-visualización-simple)
+1. [Fase 0 - Visualización simple](#fase-0---visualización-simple)
    - cargar una salida ya existente de DA3-Streaming
    - abrir RViz2
    - ver el pointcloud y la geometría de cámaras
 
-2. [Fase 1 - Grabación y procesado](#fase-1-grabación-y-procesado)
+2. [Fase 1 - Grabación y procesado](#fase-1---grabación-y-procesado)
    - suscribirse a una cámara en ROS2
    - empezar a guardar imágenes una vez se llame un servicio
    - parar la grabación de imágenes con otro servicio
    - lanzar DA3-Streaming al terminar
    - publicar automáticamente el resultado en RViz2
 
-3. [Fase 2 - Mapeado incremental](#fase-2-mapeado-incremental)
+3. [Fase 2 - Mapeado incremental](#fase-2---mapeado-incremental)
    - suscribirse a una cámara en ROS2
    - empezar una sesión incremental una vez se llame un servicio
    - guardar frames mientras llegan imágenes
