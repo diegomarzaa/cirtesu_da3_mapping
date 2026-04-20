@@ -69,6 +69,7 @@ _FRAME_ID = "da3_world"
 _TARGET_SAVE_FPS = 1.0
 _DEBUG_SAVE = False
 _VOXEL_SIZE = 0.01
+_PUBLISH_ACCUMULATED = True
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -202,6 +203,7 @@ class IncrementalMapperNode(Node):
         self.declare_parameter('target_save_fps', _TARGET_SAVE_FPS)
         self.declare_parameter('debug_save', _DEBUG_SAVE)
         self.declare_parameter('voxel_downsample', _VOXEL_SIZE)
+        self.declare_parameter('publish_accumulated', _PUBLISH_ACCUMULATED)
 
         self._image_topic = self.get_parameter('image_topic').value
         self._session_base = self.get_parameter('session_base_dir').value
@@ -214,6 +216,7 @@ class IncrementalMapperNode(Node):
         self._target_save_fps = float(self.get_parameter('target_save_fps').value)
         self._debug_save = bool(self.get_parameter('debug_save').value)
         self._voxel_size = float(self.get_parameter('voxel_downsample').value)
+        self._publish_accumulated = bool(self.get_parameter('publish_accumulated').value)
 
         # Latched QoS: late subscribers still get the last sample.
         latched = QoSProfile(
@@ -270,6 +273,10 @@ class IncrementalMapperNode(Node):
         ))
         self.get_logger().info(
             f'Input topic: {self._image_topic} | session_base_dir: {self._session_base}'
+        )
+        self.get_logger().info(
+            f'Pointcloud publish mode: '
+            f'{"accumulated map" if self._publish_accumulated else "new chunk only"}'
         )
         self.get_logger().info(
             '→ ros2 service call /incremental_mapper/start std_srvs/srv/Trigger {}'
@@ -438,7 +445,10 @@ class IncrementalMapperNode(Node):
         stamp = self.get_clock().now().to_msg()
         header = Header(frame_id=self._frame_id, stamp=stamp)
 
-        self._publish_accumulated_pointcloud(header)
+        if self._publish_accumulated:
+            self._publish_accumulated_pointcloud(header)
+        else:
+            self._publish_pointcloud(result.points, result.colors, header)
         self._publish_accumulated_path(header)
 
         self.get_logger().info(color(
@@ -453,6 +463,16 @@ class IncrementalMapperNode(Node):
                 return
             pts = np.concatenate([p for p, _ in self._map_chunks], axis=0)
             clr = np.concatenate([c for _, c in self._map_chunks], axis=0)
+        self._publish_pointcloud(pts, clr, header)
+
+    def _publish_pointcloud(
+        self,
+        pts: np.ndarray,
+        clr: np.ndarray,
+        header: Header,
+    ) -> None:
+        if len(pts) == 0:
+            return
         if self._voxel_size > 0.0:
             pts, clr = _voxel_downsample(pts, clr, self._voxel_size)
         self._pc_pub.publish(build_pointcloud2(pts, clr, header))

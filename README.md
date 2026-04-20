@@ -3,23 +3,21 @@
 Integración de ROS2 para mapeado 3D usando DA3-Streaming.
 
 1. [Fase 0 - Visualización simple](#fase-0---visualización-simple)
-   - cargar una salida ya existente de DA3-Streaming
-   - abrir RViz2
-   - ver el pointcloud y la geometría de cámaras
-
+  - cargar una salida ya existente de DA3-Streaming
+  - abrir RViz2
+  - ver el pointcloud y la geometría de cámaras
 2. [Fase 1 - Grabación y procesado](#fase-1---grabación-y-procesado)
-   - suscribirse a una cámara en ROS2
-   - empezar a guardar imágenes una vez se llame un servicio
-   - parar la grabación de imágenes con otro servicio
-   - lanzar DA3-Streaming al terminar
-   - publicar automáticamente el resultado en RViz2
-
+  - suscribirse a una cámara en ROS2
+  - empezar a guardar imágenes una vez se llame un servicio
+  - parar la grabación de imágenes con otro servicio
+  - lanzar DA3-Streaming al terminar
+  - publicar automáticamente el resultado en RViz2
 3. [Fase 2 - Mapeado incremental](#fase-2---mapeado-incremental)
-   - suscribirse a una cámara en ROS2
-   - empezar una sesión incremental una vez se llame un servicio
-   - guardar frames mientras llegan imágenes
-   - procesar chunks solapados con DA3-Streaming en paralelo
-   - publicar el mapa y la trayectoria acumulados en RViz2 mientras se van guardando frames
+  - suscribirse a una cámara en ROS2
+  - empezar una sesión incremental una vez se llame un servicio
+  - guardar frames mientras llegan imágenes
+  - procesar chunks solapados con DA3-Streaming en paralelo
+  - publicar el mapa y la trayectoria acumulados en RViz2 mientras se van guardando frames
 
 ## Pre-requisitos
 
@@ -31,7 +29,7 @@ cd Depth-Anything-3
 git submodule update --init --recursive
 ```
 
-- [ ] TODO: Linkear commit exacto y indicar dependencias exactas. En el repo de ellos no está perfecto.
+- !!!!!!!!!!!! PENDIENTE: Linkear commit exacto y indicar dependencias exactas. En el repo de ellos no está perfecto y yo tengo cambios en local.
 
 ## Fase 0 - Visualización simple
 
@@ -63,14 +61,16 @@ Topics:
 
 Parámetros principales:
 
-| Parámetro | Descripción |
-|---|---|
-| `ply_path` | Ruta al fichero `.ply` |
-| `camera_poses_path` | Ruta a `camera_poses.txt` |
-| `intrinsics_path` | Ruta a `intrinsic.txt` |
-| `voxel_downsample` | `0` = desactivado; p.ej. `0.02` |
-| `frame_id` | TF frame del header |
-| `publish_rate_hz` | `0` = one-shot; `>0` = periódico |
+
+| Parámetro           | Descripción                      |
+| ------------------- | -------------------------------- |
+| `ply_path`          | Ruta al fichero `.ply`           |
+| `camera_poses_path` | Ruta a `camera_poses.txt`        |
+| `intrinsics_path`   | Ruta a `intrinsic.txt`           |
+| `voxel_downsample`  | `0` = desactivado; p.ej. `0.02`  |
+| `frame_id`          | TF frame del header              |
+| `publish_rate_hz`   | `0` = one-shot; `>0` = periódico |
+
 
 ## Fase 1 - Grabación y procesado
 
@@ -159,6 +159,20 @@ ros2 launch cirtesu_da3_mapping incremental_map.launch.py \
   voxel_downsample:=0.01
 ```
 
+Si quieres que el nodo publique solo el chunk nuevo y dejar que RViz acumule visualmente los mensajes recibidos:
+
+```bash
+ros2 launch cirtesu_da3_mapping incremental_map.launch.py \
+  image_topic:=/image_raw/compressed \
+  publish_accumulated:=false
+```
+
+Notas:
+
+- `publish_accumulated:=true` es el comportamiento por defecto: cada publicación contiene todo el mapa acumulado.
+- `publish_accumulated:=false` publica solo el chunk recién procesado; el `Path` sigue publicándose acumulado.
+- El RViz incluido en el paquete ya deja `Decay Time: 0` para `/cirtesu/map_pointcloud`, que es la configuración adecuada para conservar indefinidamente los chunks ya recibidos mientras llegan nuevos.
+
 Ejemplo con un rosbag (usando tiempo simulado):
 
 ```bash
@@ -177,3 +191,4 @@ ros2 topic echo /incremental_mapper/status
 # 5. Parar la sesión al terminar
 ros2 service call /incremental_mapper/stop std_srvs/srv/Trigger {}
 ```
+

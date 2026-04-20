@@ -61,6 +61,7 @@ def generate_launch_description():
     target_save_fps = LaunchConfiguration("target_save_fps")
     debug_save = LaunchConfiguration("debug_save")
     voxel_downsample = LaunchConfiguration("voxel_downsample")
+    publish_accumulated = LaunchConfiguration("publish_accumulated")
     use_sim_time = LaunchConfiguration("use_sim_time")
     rviz_config = LaunchConfiguration("rviz_config")
 
@@ -139,6 +140,11 @@ def generate_launch_description():
             description="Voxel size for downsampling before publishing.",
         ),
         DeclareLaunchArgument(
+            "publish_accumulated",
+            default_value="true",
+            description="Publish the full accumulated map each update. Set false to publish only the new chunk.",
+        ),
+        DeclareLaunchArgument(
             "use_sim_time",
             default_value="false",
             description="Use /clock instead of wall time.",
@@ -149,6 +155,7 @@ def generate_launch_description():
         LogInfo(msg=["[incremental_map] DA3 repo: ", depth_anything_3_dir]),
         LogInfo(msg=["[incremental_map] DA3 streaming dir: ", da3_streaming_dir]),
         LogInfo(msg=["[incremental_map] DA3 src dir: ", da3_src_dir]),
+        LogInfo(msg=["[incremental_map] DA3 config: ", da3_config]),
         LogInfo(msg=["[incremental_map] Session base: ", session_base_dir]),
         LogInfo(msg=["[incremental_map] Image topic: ", image_topic]),
         LogInfo(msg=["[incremental_map] Pointcloud topic: ", pointcloud_topic]),
@@ -157,6 +164,7 @@ def generate_launch_description():
         LogInfo(msg=["[incremental_map] Target save FPS: ", target_save_fps]),
         LogInfo(msg=["[incremental_map] Debug save: ", debug_save]),
         LogInfo(msg=["[incremental_map] Voxel downsample: ", voxel_downsample]),
+        LogInfo(msg=["[incremental_map] Publish accumulated: ", publish_accumulated]),
         LogInfo(msg=["[incremental_map] Use sim time: ", use_sim_time]),
         LogInfo(msg=["================================================"]),
 
@@ -193,6 +201,7 @@ def generate_launch_description():
                     "target_save_fps": target_save_fps,
                     "debug_save": debug_save,
                     "voxel_downsample": voxel_downsample,
+                    "publish_accumulated": publish_accumulated,
                 },
             ],
         ),
