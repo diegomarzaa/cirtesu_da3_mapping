@@ -10,23 +10,30 @@ Integración de ROS2 para mapeado 3D usando DA3-Streaming.
 
 ## Pre-requisitos
 
-Los módulos, pesos y utilidades de DA3 se encuentran en el repositorio `Depth-Anything-3`:
+Es necesario tener instalado DA3-Streaming y sus dependencias. Deberemos proporcionar las rutas en el fichero de configuración `config/mapping_defaults.yaml`.
 
-```bash
-git clone https://github.com/ByteDance-Seed/Depth-Anything-3.git
-cd Depth-Anything-3
-git submodule update --init --recursive
-```
+Ver instalación completa en mi fork con varios arreglos, [diegomarzaa/Depth-Anything-3](https://github.com/diegomarzaa/Depth-Anything-3/tree/main/da3_streaming).
 
 ## Configuración inicial
 
 Importante: edita el fichero `config/mapping_defaults.yaml` con las rutas de instalación de DA3 del paso anterior.
 
+Mínimo recomendable:
+
+```yaml
+da3_mapper:
+  ros__parameters:
+    da3_streaming_dir: /ruta/a/Depth-Anything-3/da3_streaming
+    da3_src_dir: /ruta/a/Depth-Anything-3/src
+    da3_config: /ruta/a/Depth-Anything-3/da3_streaming/configs/tu_config.yaml
+    image_topic: /image_raw/compressed
+```
+
 En caso de haber instalado las dependencias de DA3 en un entorno Python propio (venv, conda), configura también la variable de entorno:
 
 ```bash
 # En tu ~/.bashrc o ~/.zshrc:
-export DA3_PYTHON=/opt/venvs/da3/bin/python3
+export DA3_PYTHON=/ruta/a/Depth-Anything-3/.venv/bin/python
 ```
 
 En caso de crear otro fichero de configuración, se puede pasar como argumento al launch `params_file`.
