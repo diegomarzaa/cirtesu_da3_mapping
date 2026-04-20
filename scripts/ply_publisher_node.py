@@ -12,68 +12,13 @@ so RViz2 with Fixed Frame=`map` shows the scene upright.
 """
 import sys
 
-import numpy as np
-import open3d as o3d
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from sensor_msgs.msg import PointCloud2, PointField
-from sensor_msgs_py import point_cloud2
+from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Header
 
-def load_ply(path, voxel_size):
-    """Return (points[N,3] float32, colors[N,3] uint8).
-
-    Open3D reads PLY ``uchar`` RGB as float [0,1]; we scale back to uint8
-    because that's what the PointCloud2 RGB packing expects.
-    """
-    pcd = o3d.io.read_point_cloud(path)
-    if len(pcd.points) == 0:
-        raise RuntimeError(f'PLY is empty or unreadable: {path}')
-
-    if voxel_size > 0.0:
-        pcd = pcd.voxel_down_sample(voxel_size)
-
-    points = np.asarray(pcd.points, dtype=np.float32)
-    if pcd.has_colors():
-        colors = (np.asarray(pcd.colors) * 255.0).astype(np.uint8)
-    else:
-        colors = np.full((len(points), 3), 255, dtype=np.uint8)
-    return points, colors
-
-
-def pack_rgb_uint32(colors):
-    """Pack three uint8 channels into one uint32 field: 0x00RRGGBB.
-
-    ROS PointCloud2 historically squeezes RGB into a single 4-byte slot so a
-    point stays at 16 bytes (4 * float32) instead of 19 bytes with padding.
-    RViz's 'Color Transformer: RGB8' decodes exactly this layout.
-    """
-    r = colors[:, 0].astype(np.uint32)
-    g = colors[:, 1].astype(np.uint32)
-    b = colors[:, 2].astype(np.uint32)
-    return (r << 16) | (g << 8) | b
-
-
-def build_pointcloud2(points, colors, header):
-    """Assemble a sensor_msgs/PointCloud2 from XYZ + packed RGB.
-
-    ``dtype_from_fields`` turns the field list into a numpy structured dtype
-    whose byte layout matches the PointCloud2 binary format; ``create_cloud``
-    then copies that array straight into the message's ``data`` buffer.
-    """
-    fields = [
-        PointField(name='x',   offset=0,  datatype=PointField.FLOAT32, count=1),
-        PointField(name='y',   offset=4,  datatype=PointField.FLOAT32, count=1),
-        PointField(name='z',   offset=8,  datatype=PointField.FLOAT32, count=1),
-        PointField(name='rgb', offset=12, datatype=PointField.UINT32,  count=1),
-    ]
-    structured = np.empty(len(points), dtype=point_cloud2.dtype_from_fields(fields))
-    structured['x'] = points[:, 0]
-    structured['y'] = points[:, 1]
-    structured['z'] = points[:, 2]
-    structured['rgb'] = pack_rgb_uint32(colors)
-    return point_cloud2.create_cloud(header, fields, structured)
+from cirtesu_da3_mapping.pointcloud_utils import build_pointcloud2, load_ply
 
 
 class PlyPublisher(Node):
@@ -88,11 +33,11 @@ class PlyPublisher(Node):
 
         ply_path = self.get_parameter('ply_path').value
         frame_id = self.get_parameter('frame_id').value
-        topic = self.get_parameter('topic').value
-        rate_hz = self.get_parameter('publish_rate_hz').value
-        voxel = self.get_parameter('voxel_downsample').value
+        topic    = self.get_parameter('topic').value
+        rate_hz  = self.get_parameter('publish_rate_hz').value
+        voxel    = self.get_parameter('voxel_downsample').value
 
-        # PLY is loaded once at startup. Re-reading on every tick would stream
+        # PLY is loaded once at startup — re-reading on every tick would push
         # the same hundreds of MB over DDS for nothing.
         self.get_logger().info(f'Loading PLY: {ply_path}')
         points, colors = load_ply(ply_path, voxel)
@@ -101,16 +46,17 @@ class PlyPublisher(Node):
             f'(voxel_downsample={voxel if voxel > 0 else "off"})'
         )
 
-        header = Header()
-        header.frame_id = frame_id
-        header.stamp = self.get_clock().now().to_msg()
+        header = Header(
+            frame_id=frame_id,
+            stamp=self.get_clock().now().to_msg(),
+        )
         self._msg = build_pointcloud2(points, colors, header)
 
         # QoS:
         #   rate == 0  → publish once with TRANSIENT_LOCAL so any subscriber
         #                (RViz) that connects *after* we publish still gets
-        #                the last sample. This is the "latched topic" pattern.
-        #   rate > 0   → periodic publishing with default QoS.
+        #                the last sample — the "latched topic" pattern.
+        #   rate > 0   → periodic publishing with default volatile QoS.
         one_shot = rate_hz <= 0.0
         if one_shot:
             qos = QoSProfile(

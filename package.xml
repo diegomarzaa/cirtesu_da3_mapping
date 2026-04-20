@@ -3,7 +3,7 @@
 <package format="3">
   <name>cirtesu_da3_mapping</name>
   <version>0.1.0</version>
-  <description>ROS2 nodes for DA3-Streaming mapping pipeline: PLY pointcloud publisher and (future) recording+processing workflow.</description>
+  <description>ROS2 nodes for DA3-Streaming mapping pipeline: PLY pointcloud publisher and recording+processing workflow.</description>
   <maintainer email="diego@cirtesu.es">Diego</maintainer>
   <license>Apache-2.0</license>
 

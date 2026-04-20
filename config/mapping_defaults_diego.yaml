@@ -1,0 +1,20 @@
+da3_mapper:
+  ros__parameters:
+    use_sim_time: false
+    processing_mode: incremental  # incremental or on_stop
+
+    image_topic: /image_raw/compressed
+    session_base_dir: /home/diego/Cirtesu/tmp/testeitos
+
+    da3_streaming_dir: /home/diego/Cirtesu/Repositories/Depth-Anything-3/da3_streaming
+    da3_src_dir: /home/diego/Cirtesu/Repositories/Depth-Anything-3/src
+    da3_config: /home/diego/Cirtesu/Repositories/Depth-Anything-3/da3_streaming/configs/diego_config.yaml
+    
+    pointcloud_topic: /cirtesu/map_pointcloud
+    path_topic: /cirtesu/camera_path
+    frame_id: da3_world
+
+    target_save_fps: 1.0
+    debug_save: false
+    voxel_downsample: 0.001
+    publish_accumulated: true
