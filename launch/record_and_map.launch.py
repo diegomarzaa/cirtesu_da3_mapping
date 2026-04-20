@@ -86,7 +86,7 @@ def generate_launch_description():
             "da3_config",
             default_value=EnvironmentVariable(
                 "DA3_CONFIG",
-                default_value=PathJoinSubstitution([pkg_share, "config", "da3_streaming.yaml"]),
+                default_value="",
             ),
             description="DA3 streaming YAML config.",
         ),

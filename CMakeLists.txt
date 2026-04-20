@@ -17,11 +17,10 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install launch, rviz, config directories
+# Install launch and RViz resources shipped by this package.
 install(DIRECTORY
   launch
   rviz
-  config
   DESTINATION share/${PROJECT_NAME}
 )
 
