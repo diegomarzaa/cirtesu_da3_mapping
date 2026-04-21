@@ -37,6 +37,14 @@ def _prepare_da3_paths(da3_streaming_dir: str, da3_src_dir: str | None) -> None:
         sys.path.insert(0, da3_src_dir)
 
 
+def _resolve_weight_paths(config: dict, da3_streaming_dir: str) -> None:
+    weights = config.get("Weights", {})
+    for key in ("DA3", "DA3_CONFIG", "SALAD"):
+        path = weights.get(key)
+        if path and not os.path.isabs(path):
+            weights[key] = os.path.abspath(os.path.join(da3_streaming_dir, path))
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Public result type
 # ──────────────────────────────────────────────────────────────────────────────
@@ -96,6 +104,7 @@ class DA3Engine:
         self._align_point_maps = weighted_align_point_maps
 
         self._cfg = load_config(config_path)
+        _resolve_weight_paths(self._cfg, da3_streaming_dir)
         m = self._cfg["Model"]
         self.chunk_size = int(m["chunk_size"])
         self.overlap = int(m["overlap"])

@@ -3,20 +3,77 @@
 Integración de ROS2 para mapeado 3D usando DA3-Streaming.
 
 - [cirtesu\_da3\_mapping](#cirtesu_da3_mapping)
-    - [Pre-requisitos](#pre-requisitos)
-    - [Configuración inicial](#configuración-inicial)
+    - [Pre-requisitos y Configuración Inicial](#pre-requisitos-y-configuración-inicial)
+        - [Sistema - Depth Anything 3 + ROS2](#sistema---depth-anything-3--ros2)
+        - [DA3-Streaming - Descarga de Modelos](#da3-streaming---descarga-de-modelos)
+        - [DA3 Streaming - Fichero de Configuración](#da3-streaming---fichero-de-configuración)
+        - [Paquete - Fichero de configuración](#paquete---fichero-de-configuración)
     - [Mapeado en tiempo real](#mapeado-en-tiempo-real)
     - [Visualización simple](#visualización-simple)
 
-## Pre-requisitos
+## Pre-requisitos y Configuración Inicial
 
-Es necesario tener instalado DA3-Streaming y sus dependencias. Deberemos proporcionar las rutas en el fichero de configuración `config/mapping_defaults.yaml`.
+### Sistema - Depth Anything 3 + ROS2
 
-Ver instalación completa en mi fork con varios arreglos, [diegomarzaa/Depth-Anything-3](https://github.com/diegomarzaa/Depth-Anything-3/tree/main/da3_streaming).
+Es necesario tener un entorno con ROS2, DA3-Streaming y sus dependencias Python.
 
-## Configuración inicial
+La opción más directa es usar los dockers siguientes:
 
-Importante: edita el fichero `config/mapping_defaults.yaml` con las rutas de instalación de DA3 del paso anterior.
+- [diegomarzaa/dockers_cirtesu](https://github.com/diegomarzaa/dockers_cirtesu)
+
+También es importante tener el repositorio de DA3 clonado, para configurar el funcionamiento de DA3-Streaming y para descargar los pesos.
+
+- Fork con ajustes (recomendado): [diegomarzaa/Depth-Anything-3](https://github.com/diegomarzaa/Depth-Anything-3)
+- Repositorio oficial: [ByteDance-Seed/Depth-Anything-3](https://github.com/ByteDance-Seed/Depth-Anything-3)
+
+### DA3-Streaming - Descarga de Modelos
+
+Desde el repositorio de DA3 (suponemos fork), los pesos se pueden descargar con:
+
+```bash
+cd /ruta/a/Depth-Anything-3/da3_streaming
+
+# Modelo pequeño
+bash scripts/download_weights.sh small
+
+# Modelo base
+bash scripts/download_weights.sh base
+
+# Otros
+bash scripts/download_weights.sh -h
+```
+
+El script deja la estructura así:
+
+```text
+da3_streaming/weights/
+  DA3-SMALL/
+    config.json
+    model.safetensors
+  DA3-BASE/
+    config.json
+    model.safetensors
+  dino_salad.ckpt
+```
+
+### DA3 Streaming - Fichero de Configuración
+
+En el repositorio de DA3, en el fichero `Depth-Anything-3/da3_streaming/configs/base_config.yaml`, poner la ruta de los pesos que hemos descargado. Por ejemplo, para el modelo DA3-SMALL:
+
+```yaml
+Weights:
+  DA3: './weights/DA3-SMALL/model.safetensors'
+  DA3_CONFIG: './weights/DA3-SMALL/config.json'
+  SALAD: './weights/dino_salad.ckpt'
+```
+
+Aquí también se podrán modificar otros parámetros, como el tamaño de los chunks, el número de imágenes por chunk, etc.
+
+### Paquete - Fichero de configuración
+
+Finalmente, indicamos los parámetros del fichero de configuración de DA3-Streaming anterior, además de otras rutas de las carpetas de DA3.
+
+Fichero: `config/mapping_defaults.yaml` en este paquete. 
 
 Mínimo recomendable:
 
@@ -29,19 +86,26 @@ da3_mapper:
     image_topic: /image_raw/compressed
 ```
 
-En caso de haber instalado las dependencias de DA3 en un entorno Python propio (venv, conda), configura también la variable de entorno:
+En caso de usar fichero de configuración personalizado:
 
 ```bash
-# En tu ~/.bashrc o ~/.zshrc:
-export DA3_PYTHON=/ruta/a/Depth-Anything-3/.venv/bin/python
+ros2 launch cirtesu_da3_mapping mapping.launch.py \
+  params_file:=/ruta/a/mi_mapping_defaults.yaml
 ```
-
-En caso de crear otro fichero de configuración, se puede pasar como argumento al launch `params_file`.
 
 ## Mapeado en tiempo real
 
+Una vez configurado todo, se puede lanzar:
+
 ```bash
 ros2 launch cirtesu_da3_mapping mapping.launch.py
+```
+
+o bien, si se quiere usar un fichero de configuración personalizado:
+
+```bash
+ros2 launch cirtesu_da3_mapping mapping.launch.py \
+  params_file:=/ruta/a/mi_mapping_defaults.yaml
 ```
 
 El mapeado incremental procesa chunks de frames en paralelo mientras siguen llegando imágenes, y va publicando el mapa acumulado en tiempo real.
@@ -49,7 +113,11 @@ El mapeado incremental procesa chunks de frames en paralelo mientras siguen lleg
 ```bash
 # 1. Lanzar en modo incremental (por defecto)
 ros2 launch cirtesu_da3_mapping mapping.launch.py processing_mode:=incremental
+```
 
+y desde otro terminal:
+
+```bash
 # 2. Empezar sesión
 ros2 service call /da3_mapper/start std_srvs/srv/Trigger {}
 
