@@ -9,6 +9,7 @@ import threading
 from enum import Enum, auto
 from pathlib import Path
 
+import numpy as np
 import rclpy
 from nav_msgs.msg import Path as NavPath
 from rclpy.node import Node
@@ -68,6 +69,7 @@ class UnifiedMappingNode(Node):
         self.declare_parameter("debug_save", False)
         self.declare_parameter("voxel_downsample", 0.01)
         self.declare_parameter("publish_accumulated", True)
+        # self.declare_parameter("max_publish_points", 900000)
 
         self._processing_mode = self.get_parameter("processing_mode").value
         if self._processing_mode not in _PROCESSING_MODES:
@@ -88,6 +90,7 @@ class UnifiedMappingNode(Node):
         self._debug_save = bool(self.get_parameter("debug_save").value)
         self._voxel_size = float(self.get_parameter("voxel_downsample").value)
         self._publish_accumulated = bool(self.get_parameter("publish_accumulated").value)
+        # self._max_publish_points = int(self.get_parameter("max_publish_points").value)
         self._min_period_ns = (
             int(1e9 / self._target_save_fps) if self._target_save_fps > 0.0 else 0
         )
@@ -130,6 +133,18 @@ class UnifiedMappingNode(Node):
             "DA3 model ready "
             f"(chunk_size={self._engine.chunk_size}, "
             f"overlap={self._engine.overlap}, device={self._engine.device})."
+            f"Parameters:"
+            f"\n  target_save_fps: {self._target_save_fps}"
+            f"\n  debug_save: {self._debug_save}"
+            f"\n  voxel_downsample: {self._voxel_size}"
+            f"\n  publish_accumulated: {self._publish_accumulated}"
+            f"\n  image_topic: {self._image_topic}"
+            f"\n  processing_mode: {self._processing_mode}"
+            f"\n  session_base_dir: {self._session_base_dir}"
+            f"\n  da3_streaming_dir: {self._da3_streaming_dir}"
+            f"\n  da3_src_dir: {self._da3_src_dir}"
+            f"\n  da3_config: {self._da3_config}"
+            # f"\n  max_publish_points: {self._max_publish_points}"
         )
         self.get_logger().info(
             f"Mode={self._processing_mode}, image_topic={self._image_topic}. "
@@ -423,6 +438,10 @@ class UnifiedMappingNode(Node):
         if len(points) == 0:
             return
         points, colors = voxel_downsample(points, colors, self._voxel_size)
+        # if self._max_publish_points > 0 and len(points) > self._max_publish_points:
+        #     idx = np.random.choice(len(points), self._max_publish_points, replace=False)
+        #     points = points[idx]
+        #     colors = colors[idx]
         self._pc_pub.publish(build_pointcloud2(points, colors, header))
 
     def _publish_accumulated_path(self, header: Header) -> None:
