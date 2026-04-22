@@ -11,6 +11,7 @@ ament_python_install_package(${PROJECT_NAME})
 # Install executable scripts
 install(PROGRAMS
   cirtesu_da3_mapping/mapping_node.py
+  scripts/glb_publisher_node.py
   scripts/ply_publisher_node.py
   scripts/camera_poses_publisher_node.py
   DESTINATION lib/${PROJECT_NAME}
