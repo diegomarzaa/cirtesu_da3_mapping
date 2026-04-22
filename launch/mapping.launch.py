@@ -49,6 +49,9 @@ def generate_launch_description() -> LaunchDescription:
     rviz_config     = LaunchConfiguration("rviz_config")
     image_topic     = LaunchConfiguration("image_topic")
     processing_mode = LaunchConfiguration("processing_mode")
+# voxel_downsample = LaunchConfiguration("voxel_downsample")
+    # max_publish_points = LaunchConfiguration("max_publish_points")
+    publish_accumulated = LaunchConfiguration("publish_accumulated")
 
     return LaunchDescription([
         # ------------------------------------------------------------------
@@ -94,6 +97,11 @@ def generate_launch_description() -> LaunchDescription:
             default_value=default_rviz_config,
             description="RViz configuration file.",
         ),
+        DeclareLaunchArgument(
+            "publish_accumulated",
+            default_value="false",
+            description="Publish accumulated cloud each chunk instead of only the new chunk.",
+        ),
 
         LogInfo(msg=["=============== DA3 MAPPING LAUNCH ==============="]),
         LogInfo(msg=["[mapping] Python interpreter : ", da3_python]),
@@ -134,6 +142,7 @@ def generate_launch_description() -> LaunchDescription:
                     "use_sim_time": use_sim_time,
                     "image_topic": image_topic,
                     "processing_mode": processing_mode,
+                    "publish_accumulated": publish_accumulated,
                 },
             ],
         ),
