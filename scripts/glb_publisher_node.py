@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import sys
 
-import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
@@ -20,42 +19,8 @@ from std_msgs.msg import Header
 
 from cirtesu_da3_mapping.pointcloud_utils import (
     build_pointcloud2,
-    voxel_downsample,
+    load_da3_glb,
 )
-
-
-def load_da3_glb(path: str, voxel_size: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
-    """Load point geometries from a DA3 GLB as float32 XYZ and uint8 RGB."""
-    import trimesh
-
-    scene = trimesh.load(path, force="scene")
-    point_sets = []
-    color_sets = []
-
-    for geom in scene.geometry.values():
-        if not isinstance(geom, trimesh.points.PointCloud):
-            continue
-
-        points = np.asarray(geom.vertices, dtype=np.float32)
-        if len(points) == 0:
-            continue
-
-        vertex_colors = getattr(geom.visual, "vertex_colors", None)
-        if vertex_colors is None or len(vertex_colors) != len(points):
-            colors = np.full((len(points), 3), 255, dtype=np.uint8)
-        else:
-            colors = np.asarray(vertex_colors[:, :3], dtype=np.uint8)
-
-        point_sets.append(points)
-        color_sets.append(colors)
-
-    if not point_sets:
-        raise RuntimeError(f"GLB has no PointCloud geometry: {path}")
-
-    points = np.concatenate(point_sets, axis=0)
-    colors = np.concatenate(color_sets, axis=0)
-    points, colors = voxel_downsample(points, colors, voxel_size)
-    return points, colors
 
 
 class GlbPublisher(Node):

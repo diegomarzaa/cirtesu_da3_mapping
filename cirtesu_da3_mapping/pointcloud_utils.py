@@ -62,8 +62,49 @@ def voxel_downsample(
     return points[idx], colors[idx]
 
 
+def load_da3_glb(path: str, voxel_size: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+    """Load point geometries from a DA3 GLB as float32 XYZ and uint8 RGB."""
+    import trimesh
+
+    scene = trimesh.load(path, force="scene")
+    point_sets = []
+    color_sets = []
+
+    for geom in scene.geometry.values():
+        if not isinstance(geom, trimesh.points.PointCloud):
+            continue
+
+        points = np.asarray(geom.vertices, dtype=np.float32)
+        if len(points) == 0:
+            continue
+
+        vertex_colors = getattr(geom.visual, "vertex_colors", None)
+        if vertex_colors is None or len(vertex_colors) != len(points):
+            colors = np.full((len(points), 3), 255, dtype=np.uint8)
+        else:
+            colors = np.asarray(vertex_colors[:, :3], dtype=np.uint8)
+
+        point_sets.append(points)
+        color_sets.append(colors)
+
+    if not point_sets:
+        raise RuntimeError(f"GLB has no PointCloud geometry: {path}")
+
+    points = np.concatenate(point_sets, axis=0)
+    colors = np.concatenate(color_sets, axis=0)
+    points, colors = voxel_downsample(points, colors, voxel_size)
+    return points, colors
+
+
 def load_ply(path: str, voxel_size: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
-    """Load a PLY with Open3D as float32 XYZ and uint8 RGB."""
+    """Load a PLY as float32 XYZ and uint8 RGB."""
+    try:
+        return _load_ply_open3d(path, voxel_size)
+    except ImportError:
+        return _load_ply_plyfile(path, voxel_size)
+
+
+def _load_ply_open3d(path: str, voxel_size: float) -> tuple[np.ndarray, np.ndarray]:
     import open3d as o3d
 
     pcd = o3d.io.read_point_cloud(path)
@@ -77,6 +118,36 @@ def load_ply(path: str, voxel_size: float = 0.0) -> tuple[np.ndarray, np.ndarray
         colors = (np.asarray(pcd.colors) * 255.0).astype(np.uint8)
     else:
         colors = np.full((len(points), 3), 255, dtype=np.uint8)
+    return points, colors
+
+
+def _load_ply_plyfile(path: str, voxel_size: float) -> tuple[np.ndarray, np.ndarray]:
+    from plyfile import PlyData
+
+    ply = PlyData.read(path)
+    if "vertex" not in ply:
+        raise RuntimeError(f"PLY has no vertex element: {path}")
+
+    vertex = ply["vertex"].data
+    names = vertex.dtype.names or ()
+    for field in ("x", "y", "z"):
+        if field not in names:
+            raise RuntimeError(f"PLY vertex element has no {field!r} field: {path}")
+
+    points = np.column_stack((vertex["x"], vertex["y"], vertex["z"])).astype(np.float32)
+    if len(points) == 0:
+        raise RuntimeError(f"PLY is empty or unreadable: {path}")
+
+    if all(field in names for field in ("red", "green", "blue")):
+        colors = np.column_stack(
+            (vertex["red"], vertex["green"], vertex["blue"])
+        ).astype(np.uint8)
+    elif all(field in names for field in ("r", "g", "b")):
+        colors = np.column_stack((vertex["r"], vertex["g"], vertex["b"])).astype(np.uint8)
+    else:
+        colors = np.full((len(points), 3), 255, dtype=np.uint8)
+
+    points, colors = voxel_downsample(points, colors, voxel_size)
     return points, colors
 
 

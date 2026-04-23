@@ -9,6 +9,9 @@ Integración de ROS2 para mapeado 3D usando DA3-Streaming.
         - [DA3 Streaming - Fichero de Configuración](#da3-streaming---fichero-de-configuración)
         - [Paquete - Fichero de configuración](#paquete---fichero-de-configuración)
     - [Mapeado en tiempo real](#mapeado-en-tiempo-real)
+    - [Mapeado simultáneo](#mapeado-simultáneo)
+    - [Procesar carpeta de imágenes](#procesar-carpeta-de-imágenes)
+    - [Extraer imágenes desde vídeo](#extraer-imágenes-desde-vídeo)
     - [Visualización simple](#visualización-simple)
 
 ## Pre-requisitos y Configuración Inicial
@@ -155,6 +158,108 @@ ros2 bag play /ruta/al/bag --clock
 # Parar al terminar
 ```
 
+## Mapeado simultáneo
+
+Modo alternativo pensado para buscar la máxima calidad, en lugar de dividir por chunks, se capturan imágenes continuamente y se reconstruye el mapa completo cada cierto tiempo. Pensado para ordenador con GPU potente y casos con pocas imágenes (por defecto hasta 80), una vez se pase de esto, se hará DA3-Streaming.
+
+```bash
+ros2 launch cirtesu_da3_mapping mapping_simultaneous.launch.py \
+  image_topic:=/image_raw/compressed \
+  max_normal_images:=80 \
+  min_images_initial:=8 \
+  min_new_images:=8 \
+  min_seconds_between_runs:=30.0
+```
+
+Servicios útiles:
+
+```bash
+ros2 service call /mapping_simultaneous/start std_srvs/srv/Trigger {}
+ros2 service call /mapping_simultaneous/run_now std_srvs/srv/Trigger {}
+ros2 service call /mapping_simultaneous/stop std_srvs/srv/Trigger {}
+ros2 topic echo /mapping_simultaneous/status
+```
+
+Parámetros habituales:
+
+```bash
+ros2 launch cirtesu_da3_mapping mapping_simultaneous.launch.py \
+  process_res:=504 \
+  num_max_points:=4000000 \
+  conf_thresh_percentile:=10.0 \
+  voxel_downsample:=0.0 \
+  save_depth_outputs:=true \
+  fallback_to_streaming:=true
+```
+
+## Procesar carpeta de imágenes
+
+Este modo procesa una carpeta ya existente, publica el resultado como `PointCloud2` y guarda las salidas de DA3 en una carpeta de ejecución.
+
+```bash
+ros2 launch cirtesu_da3_mapping mapping_folder.launch.py \
+  image_dir:=/home/usuario/DockerWorkspace/src/media/puerto/dataset_1_red_mar_imgs_contour/
+```
+
+Ejemplo con salida y parámetros explícitos:
+
+```bash
+ros2 launch cirtesu_da3_mapping mapping_folder.launch.py \
+  image_dir:=/ruta/a/imagenes \
+  output_dir:=/home/usuario/DockerWorkspace/tmp/da3_folder_mapping \
+  max_normal_images:=80 \
+  process_res:=504 \
+  num_max_points:=4000000 \
+  conf_thresh_percentile:=10.0 \
+  save_depth_outputs:=true
+```
+
+Si `process_on_start:=false`, se puede lanzar manualmente:
+
+```bash
+ros2 service call /mapping_folder/run std_srvs/srv/Trigger {}
+ros2 topic echo /mapping_folder/status
+```
+
+Para forzar DA3-Streaming:
+
+```bash
+ros2 launch cirtesu_da3_mapping mapping_folder.launch.py \
+  image_dir:=/ruta/a/imagenes \
+  force_streaming:=true
+```
+
+Cuando `save_depth_outputs:=true`, las salidas se guardan dentro del run en:
+
+```text
+depth/npz/
+depth/colored/
+```
+
+## Extraer imágenes desde vídeo
+
+El script `video_to_images.py` convierte un vídeo en una carpeta de imágenes para usar con `mapping_folder.launch.py`.
+
+```bash
+ros2 run cirtesu_da3_mapping video_to_images.py \
+  /ruta/al/video.mp4 \
+  /ruta/salida/imagenes \
+  --fps 5 \
+  --max-width 1280
+```
+
+Opciones útiles:
+
+```bash
+ros2 run cirtesu_da3_mapping video_to_images.py \
+  /ruta/al/video.mp4 \
+  /ruta/salida/imagenes \
+  --start-sec 10 \
+  --end-sec 40 \
+  --max-frames 80 \
+  --overwrite
+```
+
 ## Visualización simple
 
 Visualizar en RViz2 una salida ya generada por DA3-Streaming, en formato PLY.
@@ -173,5 +278,16 @@ ros2 launch cirtesu_da3_mapping visualize_ply.launch.py \
 # Con voxel downsample (acelera RViz para nubes grandes)
 ros2 launch cirtesu_da3_mapping visualize_ply.launch.py \
   ply_path:=/ruta/a/combined_pcd.ply \
+  voxel_downsample:=0.02
+```
+
+Visualizar una salida GLB generada por DA3 normal:
+
+```bash
+ros2 launch cirtesu_da3_mapping visualize_glb.launch.py \
+  glb_path:=/ruta/a/scene.glb
+
+ros2 launch cirtesu_da3_mapping visualize_glb.launch.py \
+  glb_path:=/ruta/a/scene.glb \
   voxel_downsample:=0.02
 ```
